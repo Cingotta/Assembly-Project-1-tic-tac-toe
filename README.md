@@ -1,2 +1,2 @@
 # Assembly-Project-1-tic-tac-toe
-Assembly 8086 project that simulates a Tic-Tac-Toe game between two players or against the computer. The game uses a 3x3 board and applies concepts such as jumps, data input and output, arrays, and subroutines. Must be completed in groups of up to two students and submitted via Canvas by November 15th.
+Assembly 8086 project that simulates a Tic-Tac-Toe game between two players or against the computer. The game uses a 3x3 board and applies concepts such as jumps, data input and output, arrays, and subroutines. 
