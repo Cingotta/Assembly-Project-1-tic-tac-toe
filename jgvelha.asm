@@ -2,6 +2,11 @@ TITLE JogoDaVelha
 .MODEL SMALL
 .STACK 100h
 
+; LEMBRETES:
+; colocar o arquivo macros.inc na mesma pasta desse arquivo
+; use a extencao MASM/TASM do VSCode para rodar esse programa
+; nas opções da extencao, ter 'Masmtasm.ASM: Mode' como 'workspace' para reconhecer o INCLUDE
+
 INCLUDE macros.inc
 
 .DATA
