@@ -36,9 +36,7 @@ INCLUDE macros.inc
     
     ; a matris do jogo (3x3)
     ; 1-9 = vazio, X = player 1, O = player 2
-    tabuleiro     DB '1', '2', '3'
-                  DB '4', '5', '6'
-                  DB '7', '8', '9'
+    tabuleiro     DB 3 DUP (3 DUP (?))
     
     ; variaveis pra controlar o jogo
     modo_jogo     DB 0  ; 1 eh pvp, 2 eh contra pc
@@ -118,8 +116,7 @@ MENU_PRINCIPAL:
     
 LER_OPCAO_MENU:
     ; le a opcao que o usuario digitou
-    MOV AH, 07h ; Usa 07h pq 01h imprime o caracter que foi mostrado, ja 07h ele não mostra
-    INT 21h
+    SCANCHAR
     
     ; valida se eh 1 ou 2
     CMP AL, '1'
@@ -130,11 +127,7 @@ LER_OPCAO_MENU:
     JNE LER_OPCAO_MENU
     JMP SAIR  ; se nao for 1, 2 OU 3 le de novo
 
-RELAY_SAIR:
-    ; isso é necessário pq o JE é um pulo curte e ele não consegue chegar no fim do mais
-    ; antes de dar errado, então precisa de um relay para ele conseguir chegar la
-    ;pq jmp tem alcance no arquivo inteiro  
-    JMP SAIR
+
 OPCAO_VALIDA:
 
 
@@ -143,23 +136,15 @@ OPCAO_VALIDA:
     
     ; --- RESET DO JOGO
     ; zera o tabuleiro tudo pra 1-9 de novo
-    MOV CX, 9
-    MOV BX, 0
+    ;coloca ambos contadores em 3 (linha e coluna)
+    CLEARMAT tabuleiro
 
-
-
-ZERAR_TUDO:
-    MOV AL, BL
-    ADD AL, '1'
-    MOV tabuleiro[BX], AL
-    INC BX
-    LOOP ZERAR_TUDO
     
     MOV jogadas_count, 0
     MOV jogador_vez, 'X'
     
     ; limpa a tela pra comecar
-    CALL LIMPA_TELA
+    LIMPATELA
 
 
 
@@ -332,6 +317,7 @@ CPU_JOGOU:
 ESPERA_PC:
     NOP 
     NOP
+    NOP
     LOOP ESPERA_PC
     
 FIM_JOGADA:
@@ -471,7 +457,7 @@ SAIR:
     INT 10h
 
     ; loop duplo para dar tempo o bastante de ler a mensagem
-    ; tome cuidado, qualquer alteração, emsmo pequena muda o mto o tempo de espera
+    ; tomar cuidado, qualquer alteração, emsmo pequena muda o mto o tempo de espera
     MOV CX, 06FFh
 LOOP_ESPERA_SAIR:
     PUSH CX
@@ -482,20 +468,20 @@ LOOP_ESPERA_INTERNA:
     POP CX
     LOOP LOOP_ESPERA_SAIR
 
-    CALL LIMPA_TELA
+    LIMPATELA
     ; sai do jogo
     MOV AH, 4Ch
     INT 21h
 MAIN ENDP
 
-; ------------------------------------------------
-; funcao q desenha a matris na tela
-; usa loops pra percorrer a matris 3x3
-; ------------------------------------------------
+
 DESENHA_MATRIZ PROC
-    CALL LIMPA_TELA
+    ; procedimento - funcao que desenha a matriz na tela, usa loops pra percorrer a matriz 3x3
+    ; entrada - os valores definidos no tabuleiro
+    ; saida - a matriz desenhada na tela
+    LIMPATELA
     
-    MOV BX, 0   ; linha (0, 1, 2)
+    MOV BX, 0   ; offset linha (0, 3, 6)
     MOV DH, 10  ; posicao na tela
     
 LOOP_LINHA:
@@ -508,17 +494,8 @@ LOOP_LINHA:
     MOV SI, 0   ; coluna (0, 1, 2)
     
 LOOP_COLUNA:
-    ; conta pra achar o indice: (Linha * 3) + Coluna
-    PUSH DX     ; salva DX pq o MUL estraga ele
-    MOV AX, BX
-    MOV CX, 3
-    MUL CX
-    ADD AX, SI
-    MOV DI, AX
-    POP DX  ; volta DX
-    
-    ; imprime o valor da matris
-    MOV DL, tabuleiro[DI]
+    ; simplifica a impressao do valor, usando DL direto
+    MOV DL, tabuleiro[BX][SI]
     MOV AH, 02h
     INT 21h
     
@@ -536,7 +513,7 @@ PULA_SEPARADOR:
     ; desce uma linha na tela
     INC DH
     
-    CMP BX, 2 ; se for a ultima nao desenha o traco
+    CMP BX, 6 ; se for a ultima nao desenha o traco
     JE PROXIMA_LINHA_MATRIS
     
     ; desenha o separador horizontal
@@ -546,142 +523,131 @@ PULA_SEPARADOR:
     INT 10h
     
     ; desenha -+-+-
-    MOV DL, '-'
-    MOV AH, 02h
-    INT 21h
-    MOV DL, '+'
-    INT 21h
-    MOV DL, '-'
-    INT 21h
-    MOV DL, '+'
-    INT 21h
-    MOV DL, '-'
-    INT 21h
+    SEPHOR
     
     INC DH
 
 PROXIMA_LINHA_MATRIS:
-    INC BX  ; proxima linha
-    CMP BX, 3
+    ADD BX, 3  ; proxima linha
+    CMP BX, 9
     JL LOOP_LINHA
     
     RET
 DESENHA_MATRIZ ENDP
 
-; ------------------------------------------------
-; ve se alguem ganhou
-; retorna 1 se ganhou, 0 se nao
-; fiz testando um por um pq eh mais facil
-; ------------------------------------------------
 VERIFICA_VITORIA PROC
+    ;procedimento para verificar a vitória que retorna o valor 1 se ganhou ou 0 se perdeu, 
+    ;entrada - valores salvos na matriz tabuleiro
+    ;saida - valor booleano salvo em AL
+    PUSH BX
+    PUSH SI
+
     ; --- Linhas ---
-    ; Linha 1
-    MOV AL, tabuleiro[0]
+    MOV BX, 0   ; offset linha (0, 3, 6)
+
+CHECK_LINHAS_LOOP:
+    MOV SI, 0
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
-    JBE CHECK_L2
-    CMP AL, tabuleiro[1]
-    JNE CHECK_L2
-    CMP AL, tabuleiro[2]
-    JNE CHECK_L2
-    JMP GANHOU
+    JBE PROX_LINHA
     
-CHECK_L2:
-    MOV AL, tabuleiro[3]
-    CMP AL, '9'
-    JBE CHECK_L3
-    CMP AL, tabuleiro[4]
-    JNE CHECK_L3
-    CMP AL, tabuleiro[5]
-    JNE CHECK_L3
+    MOV SI, 1
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_LINHA
+    
+    MOV SI, 2
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_LINHA
+    
     JMP GANHOU
 
-CHECK_L3:
-    MOV AL, tabuleiro[6]
+PROX_LINHA:
+    ADD BX, 3
+    CMP BX, 9
+    JL CHECK_LINHAS_LOOP
+
+    ; --- Colunas ---
+    MOV SI, 0   ; coluna (0, 1, 2)
+
+CHECK_COLUNAS_LOOP:
+    MOV BX, 0
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
-    JBE CHECK_C1
-    CMP AL, tabuleiro[7]
-    JNE CHECK_C1
-    CMP AL, tabuleiro[8]
-    JNE CHECK_C1
+    JBE PROX_COLUNA
+    
+    MOV BX, 3
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_COLUNA
+    
+    MOV BX, 6
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_COLUNA
+    
     JMP GANHOU
 
-    ; --- Colunas 
-CHECK_C1:
-    MOV AL, tabuleiro[0]
-    CMP AL, '9'
-    JBE CHECK_C2
-    CMP AL, tabuleiro[3]
-    JNE CHECK_C2
-    CMP AL, tabuleiro[6]
-    JNE CHECK_C2
-    JMP GANHOU
+PROX_COLUNA:
+    INC SI
+    CMP SI, 3
+    JL CHECK_COLUNAS_LOOP
 
-CHECK_C2:
-    MOV AL, tabuleiro[1]
-    CMP AL, '9'
-    JBE CHECK_C3
-    CMP AL, tabuleiro[4]
-    JNE CHECK_C3
-    CMP AL, tabuleiro[7]
-    JNE CHECK_C3
-    JMP GANHOU
-
-CHECK_C3:
-    MOV AL, tabuleiro[2]
-    CMP AL, '9'
-    JBE CHECK_D1
-    CMP AL, tabuleiro[5]
-    JNE CHECK_D1
-    CMP AL, tabuleiro[8]
-    JNE CHECK_D1
-    JMP GANHOU
-
-    ; --- Diagonais 
-CHECK_D1:
-    MOV AL, tabuleiro[0]
+    ; --- Diagonais ---
+    ; Diagonal 1
+    MOV BX, 0
+    MOV SI, 0
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
     JBE CHECK_D2
-    CMP AL, tabuleiro[4]
+    
+    MOV BX, 3
+    MOV SI, 1
+    CMP AL, tabuleiro[BX][SI]
     JNE CHECK_D2
-    CMP AL, tabuleiro[8]
+    
+    MOV BX, 6
+    MOV SI, 2
+    CMP AL, tabuleiro[BX][SI]
     JNE CHECK_D2
     JMP GANHOU
 
 CHECK_D2:
-    MOV AL, tabuleiro[2]
+    ; Diagonal 2
+    MOV BX, 0
+    MOV SI, 2
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
     JBE NAO_GANHOU
-    CMP AL, tabuleiro[4]
+    
+    MOV BX, 3
+    MOV SI, 1
+    CMP AL, tabuleiro[BX][SI]
     JNE NAO_GANHOU
-    CMP AL, tabuleiro[6]
+    
+    MOV BX, 6
+    MOV SI, 0
+    CMP AL, tabuleiro[BX][SI]
     JNE NAO_GANHOU
     JMP GANHOU
 
 NAO_GANHOU:
+    POP SI
+    POP BX
     MOV AL, 0
     RET
     
 GANHOU:
+    POP SI
+    POP BX
     MOV AL, 1
     RET
 VERIFICA_VITORIA ENDP
 
-; ------------------------------------------------
-; limpa a tela toda
-; ------------------------------------------------
-LIMPA_TELA PROC
-    MOV AX, 03h
-    INT 10h
-    RET
-LIMPA_TELA ENDP
 
-; ------------------------------------------------
-; animação quando ganha, ele faz tudo piscar em colocrido mas como so tem na tela agora o txto de vitoria, é so ele que pisca colorido
-; ------------------------------------------------
 EFEITO_PISCA PROC
-    ; configura video dnv
-    MOV AX, 3h
-    INT 10h
+    ;função - procedimento responsavel por criar o efeito multicor do fim de jogo
+    ;entrada - vetor mensagem de vitória no .DATA
+    ;saida - impressão da animação na tela
+    ;limpaa tela e reinicia a configuração de video
+    LIMPATELA
     
     MOV DI, 0   ; cor atual
     MOV DX, CX  ; salva tamanho
@@ -739,12 +705,12 @@ PROX_COR:
     RET
 EFEITO_PISCA ENDP
 
-; ------------------------------------------------
-; msg de derrota em vermelho
-; ------------------------------------------------
+
 MENSAGEM_PERDEU PROC
-    MOV AX, 3h
-    INT 10h
+    ;procedimento - função responsavel por atribuir a cor vermelha a mensagem de derrota por IA
+    ;entrada - mensagem de derrota no .DATA
+    ;saida - impressão na tela da mensagem de derreota com a cor vermelha
+    LIMPATELA
     
     ; poe cursor
     MOV AH, 02h
@@ -804,8 +770,24 @@ LOOP_LINHAS:
     JE PROXIMA_LINHA
     
     ; achou onde jogar
-    MOV SI, DX
-    MOV BYTE PTR tabuleiro[SI], 'O'
+
+    MOV AX, DX
+    MOV CL, 3
+    DIV CL      ; AL = Linha, AH = Coluna
+    
+    ; Configura SI (Coluna)
+    MOV BL, AH
+    MOV BH, 0
+    MOV SI, BX
+    
+    ; Configura BX Offset Linha = Linha * 3
+    MOV BL, AL
+    MOV AL, 3
+    MUL BL
+    MOV BX, AX
+    
+    MOV AL, 'O'
+    MOV tabuleiro[BX][SI], AL
     POP CX
     MOV AH, 1
     RET
@@ -827,14 +809,27 @@ ANALISA_LUGAR PROC
     PUSH SI 
     PUSH AX
     
-    MOV SI, BX  ; usa o indice linear direto (0-8)
+    MOV AX, BX
+    MOV CL, 3
+    DIV CL   ; AL = linha, AH = coluna
     
-    ; compara
+    ; Configura SI (Coluna) 
+    MOV BL, AH
+    MOV BH, 0
+    MOV SI, BX
+    
+    ; Configura BX (Offset Linha = Linha * 3)
+    MOV BL, AL
+    MOV AL, 3
+    MUL BL
+    MOV BX, AX
+
+    ; Agora compara usando a notacao de matriz [BX][SI]
     MOV AL, char_temp
-    CMP tabuleiro[SI], AL
+    CMP tabuleiro[BX][SI], AL
     JE EH_IGUAL
-    
-    CMP tabuleiro[SI], '9'
+
+    CMP tabuleiro[BX][SI], '9'
     JBE EH_LIVRE
     
     JMP SAI_DA_ANALISE
@@ -844,7 +839,8 @@ EH_IGUAL:
     JMP SAI_DA_ANALISE
 
 EH_LIVRE:
-    MOV DX, BX  ; achou vazio, guarda o indice em DX
+    MOV DX, BX
+    ADD DX, SI
     JMP SAI_DA_ANALISE
 
 SAI_DA_ANALISE:
@@ -855,4 +851,3 @@ SAI_DA_ANALISE:
 ANALISA_LUGAR ENDP
 
 END MAIN
-
