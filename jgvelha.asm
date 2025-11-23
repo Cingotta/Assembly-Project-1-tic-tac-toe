@@ -134,9 +134,7 @@ OPCAO_VALIDA:
     SUB AL, '0' ; transforma letra em numero
     MOV modo_jogo, AL
     
-    ; --- RESET DO JOGO
     ; zera o tabuleiro tudo pra 1-9 de novo
-    ;coloca ambos contadores em 3 (linha e coluna)
     CLEARMAT tabuleiro
 
     
@@ -200,8 +198,7 @@ VEZ_HUMANO:
 LER_INPUT:
     ; essa função 07h é para pegar o caracter igal o 01h mas ele não da "echo", (ele n mostra o caracter na tela) ai fica mais bonito
 
-    MOV AH, 07h
-    INT 21h
+    SCANCHAR
     
 
     
@@ -226,7 +223,7 @@ LER_INPUT:
     ; transforma o numero q digitou em numero de vdd (0-8)
     SUB AL, '1'
     
-    ; --- CONTA DA MATRIS ---
+    ; CONTA DA MATRIZ
     ; AL tem o indice (0-8)
     MOV AH, 0
     MOV CL, 3
@@ -238,12 +235,12 @@ LER_INPUT:
     MOV BL, AL
     MOV AL, 3
     MUL BL      
-    MOV BX, AX  ; BX eh a linha
+    MOV SI, AX  ; SI eh a linha
     
     ; calcula coluna
     MOV AL, DL  ; pega a coluna de volta
     MOV AH, 0
-    MOV SI, AX  ; SI eh a coluna
+    MOV BX, AX  ; BX eh a coluna
     
     ; ve se o lugar ta vazio ou se ja tem uma jogada feita la
     ; acessa matris[BX][SI]
@@ -285,21 +282,21 @@ VEZ_CPU:
     JBE ACHOU_VAZIO_DIRETO
     
     ; 4. se nao der nada, pega o primeiro q tiver livre
-    MOV BX, 0 
+    XOR SI,SI
     
 PROCURA_VAZIO_LIN:
-    MOV SI, 0 
+    XOR BX,BX 
     
 PROCURA_VAZIO_COL:
     CMP tabuleiro[BX][SI], '9'
     JBE ACHOU_VAZIO_DIRETO ; achou um lugar vago
     
-    INC SI
-    CMP SI, 3
+    INC BX
+    CMP BX, 3
     JL PROCURA_VAZIO_COL
     
-    ADD BX, 3
-    CMP BX, 9
+    ADD SI, 3
+    CMP SI, 9
     JL PROCURA_VAZIO_LIN
     
     JMP PULO_AJUDA
@@ -423,16 +420,14 @@ ESPERA_VOLTAR:
     INT 21h
     
 ESPERA_TECLA:
-    MOV AH, 07h 
-    INT 21h
+    SCANCHAR 
     
     CMP AL, 0   ; se for tecla especial (tipo setinha)
     JE LIMPA_BUFFER_MENU
     JMP MENU_PRINCIPAL
 
 LIMPA_BUFFER_MENU:
-    MOV AH, 07h ; le o segundo byte pra nao bugar o menu
-    INT 21h
+    SCANCHAR ; le o segundo byte pra nao bugar o menu
     JMP MENU_PRINCIPAL
 
 SAIR:
@@ -480,8 +475,9 @@ DESENHA_MATRIZ PROC
     ; entrada - os valores definidos no tabuleiro
     ; saida - a matriz desenhada na tela
     LIMPATELA
-    
-    MOV BX, 0   ; offset linha (0, 3, 6)
+   
+    XOR SI,SI   ; offset linha (0, 3, 6)
+    XOR BX,BX  ; coluna (0, 1, 2)
     MOV DH, 10  ; posicao na tela
     
 LOOP_LINHA:
@@ -491,7 +487,7 @@ LOOP_LINHA:
     MOV DL, 37
     INT 10h
     
-    MOV SI, 0   ; coluna (0, 1, 2)
+    XOR BX,BX   ; coluna (0, 1, 2)
     
 LOOP_COLUNA:
     ; simplifica a impressao do valor, usando DL direto
@@ -500,20 +496,20 @@ LOOP_COLUNA:
     INT 21h
     
     ; desenha  |
-    CMP SI, 2
+    CMP BX, 2
     JE PULA_SEPARADOR
     MOV DL, '|'
     INT 21h
 PULA_SEPARADOR:
 
-    INC SI  ; proxima coluna
-    CMP SI, 3
+    INC BX  ; proxima coluna
+    CMP BX, 3
     JL LOOP_COLUNA
     
     ; desce uma linha na tela
     INC DH
     
-    CMP BX, 6 ; se for a ultima nao desenha o traco
+    CMP SI, 6 ; se for a ultima nao desenha o traco
     JE PROXIMA_LINHA_MATRIS
     
     ; desenha o separador horizontal
@@ -528,8 +524,8 @@ PULA_SEPARADOR:
     INC DH
 
 PROXIMA_LINHA_MATRIS:
-    ADD BX, 3  ; proxima linha
-    CMP BX, 9
+    ADD SI, 3  ; proxima linha
+    CMP SI, 9
     JL LOOP_LINHA
     
     RET
@@ -734,10 +730,10 @@ MENSAGEM_PERDEU PROC
     RET
 MENSAGEM_PERDEU ENDP
 
-; ------------------------------------------------
-; tenta fechar uma linha (ganhar ou bloquear)
-; ------------------------------------------------
 TENTA_FECHAR PROC
+    ; procedimento - funcao que indentifica a posição para fechar o jogo do jogador
+    ;entrada - valor de al como circulo
+    ;saida - jogada do computador se for fechar o caminho
     MOV char_temp, AL ; salva quem a gente ta procurando (X ou O)
     LEA SI, linhas_ganha
     MOV CX, 8
@@ -748,22 +744,22 @@ LOOP_LINHAS:
     MOV CH, 0       ; conta quantos tem
     MOV DX, 0FFFFh  ; guarda o vazio
     
-    ; --- Verifica Posicao 1 ---
+    ; Verifica Posicao 1
     MOV BL, [SI]
     MOV BH, 0
     CALL ANALISA_LUGAR
     
-    ; --- Verifica Posicao 2 ---
+    ; Verifica Posicao 2
     MOV BL, [SI+1]
     MOV BH, 0
     CALL ANALISA_LUGAR
     
-    ; --- Verifica Posicao 3 ---
+    ; Verifica Posicao 3 
     MOV BL, [SI+2]
     MOV BH, 0
     CALL ANALISA_LUGAR
     
-    ; --- Analisa se deve jogar ---
+    ; Analisa se deve jogar
     CMP CH, 2   ; verifica se tem 2 iguais
     JNE PROXIMA_LINHA
     CMP DX, 0FFFFh  ; verifica tem espaco vazio
@@ -775,16 +771,18 @@ LOOP_LINHAS:
     MOV CL, 3
     DIV CL      ; AL = Linha, AH = Coluna
     
-    ; Configura SI (Coluna)
-    MOV BL, AH
-    MOV BH, 0
-    MOV SI, BX
+    ; Configura BX (Coluna)
+    MOV CL, AH
+    MOV CH, 0
+    MOV BX, CX
     
     ; Configura BX Offset Linha = Linha * 3
+    PUSH BX
     MOV BL, AL
     MOV AL, 3
     MUL BL
-    MOV BX, AX
+    MOV SI, AX
+    POP BX
     
     MOV AL, 'O'
     MOV tabuleiro[BX][SI], AL
@@ -801,10 +799,11 @@ PROXIMA_LINHA:
     RET
 TENTA_FECHAR ENDP
 
-; ------------------------------------------------
-; ajuda a ver se a posicao ta boa
-; ------------------------------------------------
+
 ANALISA_LUGAR PROC
+    ;peocedimento - função para erificar viabilidade da posição que a IA ira jogar
+    ;entrada - valor dos ponteiros das posições usadas na verificação
+    ;saida - conclusão da verificação de posição
     PUSH BX 
     PUSH SI 
     PUSH AX
@@ -813,16 +812,20 @@ ANALISA_LUGAR PROC
     MOV CL, 3
     DIV CL   ; AL = linha, AH = coluna
     
-    ; Configura SI (Coluna) 
-    MOV BL, AH
-    MOV BH, 0
-    MOV SI, BX
+    ; Configura BX (Coluna) 
+    PUSH CX
+    MOV CL, AH
+    MOV CH, 0
+    MOV BX, CX
+    POP CX
     
-    ; Configura BX (Offset Linha = Linha * 3)
+    ; Configura SI (Offset Linha = Linha * 3)
+    PUSH BX
     MOV BL, AL
     MOV AL, 3
     MUL BL
-    MOV BX, AX
+    MOV SI, AX
+    POP BX
 
     ; Agora compara usando a notacao de matriz [BX][SI]
     MOV AL, char_temp

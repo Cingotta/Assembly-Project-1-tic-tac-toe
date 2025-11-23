@@ -27,18 +27,23 @@ ENDM
 
 CLEARMAT MACRO MAT
     LOCAL ZERAR_MAT
+    ;coloca ambos os contadoes em 3 (linha e coluna)
     MOV CH,3
     MOV CL,3
+
     XOR SI,SI;zera o ponteiro de linha
     LEA BX,MAT;atribui endereço da matriz ao ponteiro BX
+    ;valor de caractere 1
     MOV DL,'1'
 ZERAR_MAT:
     MOV [BX][SI],DL
+    ;incrementa para proximo caractere e posição
     INC DL
     INC BX
     DEC CL
     CMP CL,0
     JNZ ZERAR_MAT
+    ;passar para proxima linha
     SUB BX,3
     ADD SI,3
     MOV CL,3
