@@ -143,17 +143,24 @@ OPCAO_VALIDA:
     
     ; --- RESET DO JOGO
     ; zera o tabuleiro tudo pra 1-9 de novo
-    MOV CX, 9
-    MOV BX, 0
+    MOV BX, 0  ; offset linha (0, 3, 6)
+    MOV DL, '1'  ; caracter inicial
 
+ZERAR_LINHA:
+    MOV SI, 0  ; coluna (0, 1, 2)
 
-
-ZERAR_TUDO:
-    MOV AL, BL
-    ADD AL, '1'
-    MOV tabuleiro[BX], AL
-    INC BX
-    LOOP ZERAR_TUDO
+ZERAR_COLUNA:
+    MOV AL, DL
+    MOV tabuleiro[BX][SI], AL
+    INC DL   ; proximo numero
+    
+    INC SI
+    CMP SI, 3
+    JL ZERAR_COLUNA
+    
+    ADD BX, 3
+    CMP BX, 9
+    JL ZERAR_LINHA
     
     MOV jogadas_count, 0
     MOV jogador_vez, 'X'
@@ -332,6 +339,7 @@ CPU_JOGOU:
 ESPERA_PC:
     NOP 
     NOP
+    NOP
     LOOP ESPERA_PC
     
 FIM_JOGADA:
@@ -471,7 +479,7 @@ SAIR:
     INT 10h
 
     ; loop duplo para dar tempo o bastante de ler a mensagem
-    ; tome cuidado, qualquer alteração, emsmo pequena muda o mto o tempo de espera
+    ; tomar cuidado, qualquer alteração, emsmo pequena muda o mto o tempo de espera
     MOV CX, 06FFh
 LOOP_ESPERA_SAIR:
     PUSH CX
@@ -495,7 +503,7 @@ MAIN ENDP
 DESENHA_MATRIZ PROC
     CALL LIMPA_TELA
     
-    MOV BX, 0   ; linha (0, 1, 2)
+    MOV BX, 0   ; offset linha (0, 3, 6)
     MOV DH, 10  ; posicao na tela
     
 LOOP_LINHA:
@@ -508,17 +516,8 @@ LOOP_LINHA:
     MOV SI, 0   ; coluna (0, 1, 2)
     
 LOOP_COLUNA:
-    ; conta pra achar o indice: (Linha * 3) + Coluna
-    PUSH DX     ; salva DX pq o MUL estraga ele
-    MOV AX, BX
-    MOV CX, 3
-    MUL CX
-    ADD AX, SI
-    MOV DI, AX
-    POP DX  ; volta DX
-    
-    ; imprime o valor da matris
-    MOV DL, tabuleiro[DI]
+    ; simplifica a impressao do valor, usando DL direto
+    MOV DL, tabuleiro[BX][SI]
     MOV AH, 02h
     INT 21h
     
@@ -536,7 +535,7 @@ PULA_SEPARADOR:
     ; desce uma linha na tela
     INC DH
     
-    CMP BX, 2 ; se for a ultima nao desenha o traco
+    CMP BX, 6 ; se for a ultima nao desenha o traco
     JE PROXIMA_LINHA_MATRIS
     
     ; desenha o separador horizontal
@@ -561,8 +560,8 @@ PULA_SEPARADOR:
     INC DH
 
 PROXIMA_LINHA_MATRIS:
-    INC BX  ; proxima linha
-    CMP BX, 3
+    ADD BX, 3  ; proxima linha
+    CMP BX, 9
     JL LOOP_LINHA
     
     RET
@@ -574,94 +573,104 @@ DESENHA_MATRIZ ENDP
 ; fiz testando um por um pq eh mais facil
 ; ------------------------------------------------
 VERIFICA_VITORIA PROC
+    PUSH BX
+    PUSH SI
+
     ; --- Linhas ---
-    ; Linha 1
-    MOV AL, tabuleiro[0]
+    MOV BX, 0   ; offset linha (0, 3, 6)
+
+CHECK_LINHAS_LOOP:
+    MOV SI, 0
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
-    JBE CHECK_L2
-    CMP AL, tabuleiro[1]
-    JNE CHECK_L2
-    CMP AL, tabuleiro[2]
-    JNE CHECK_L2
-    JMP GANHOU
+    JBE PROX_LINHA
     
-CHECK_L2:
-    MOV AL, tabuleiro[3]
-    CMP AL, '9'
-    JBE CHECK_L3
-    CMP AL, tabuleiro[4]
-    JNE CHECK_L3
-    CMP AL, tabuleiro[5]
-    JNE CHECK_L3
+    MOV SI, 1
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_LINHA
+    
+    MOV SI, 2
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_LINHA
+    
     JMP GANHOU
 
-CHECK_L3:
-    MOV AL, tabuleiro[6]
+PROX_LINHA:
+    ADD BX, 3
+    CMP BX, 9
+    JL CHECK_LINHAS_LOOP
+
+    ; --- Colunas ---
+    MOV SI, 0   ; coluna (0, 1, 2)
+
+CHECK_COLUNAS_LOOP:
+    MOV BX, 0
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
-    JBE CHECK_C1
-    CMP AL, tabuleiro[7]
-    JNE CHECK_C1
-    CMP AL, tabuleiro[8]
-    JNE CHECK_C1
+    JBE PROX_COLUNA
+    
+    MOV BX, 3
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_COLUNA
+    
+    MOV BX, 6
+    CMP AL, tabuleiro[BX][SI]
+    JNE PROX_COLUNA
+    
     JMP GANHOU
 
-    ; --- Colunas 
-CHECK_C1:
-    MOV AL, tabuleiro[0]
-    CMP AL, '9'
-    JBE CHECK_C2
-    CMP AL, tabuleiro[3]
-    JNE CHECK_C2
-    CMP AL, tabuleiro[6]
-    JNE CHECK_C2
-    JMP GANHOU
+PROX_COLUNA:
+    INC SI
+    CMP SI, 3
+    JL CHECK_COLUNAS_LOOP
 
-CHECK_C2:
-    MOV AL, tabuleiro[1]
-    CMP AL, '9'
-    JBE CHECK_C3
-    CMP AL, tabuleiro[4]
-    JNE CHECK_C3
-    CMP AL, tabuleiro[7]
-    JNE CHECK_C3
-    JMP GANHOU
-
-CHECK_C3:
-    MOV AL, tabuleiro[2]
-    CMP AL, '9'
-    JBE CHECK_D1
-    CMP AL, tabuleiro[5]
-    JNE CHECK_D1
-    CMP AL, tabuleiro[8]
-    JNE CHECK_D1
-    JMP GANHOU
-
-    ; --- Diagonais 
-CHECK_D1:
-    MOV AL, tabuleiro[0]
+    ; --- Diagonais ---
+    ; Diagonal 1
+    MOV BX, 0
+    MOV SI, 0
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
     JBE CHECK_D2
-    CMP AL, tabuleiro[4]
+    
+    MOV BX, 3
+    MOV SI, 1
+    CMP AL, tabuleiro[BX][SI]
     JNE CHECK_D2
-    CMP AL, tabuleiro[8]
+    
+    MOV BX, 6
+    MOV SI, 2
+    CMP AL, tabuleiro[BX][SI]
     JNE CHECK_D2
     JMP GANHOU
 
 CHECK_D2:
-    MOV AL, tabuleiro[2]
+    ; Diagonal 2
+    MOV BX, 0
+    MOV SI, 2
+    MOV AL, tabuleiro[BX][SI]
     CMP AL, '9'
     JBE NAO_GANHOU
-    CMP AL, tabuleiro[4]
+    
+    MOV BX, 3
+    MOV SI, 1
+    CMP AL, tabuleiro[BX][SI]
     JNE NAO_GANHOU
-    CMP AL, tabuleiro[6]
+    
+    MOV BX, 6
+    MOV SI, 0
+    CMP AL, tabuleiro[BX][SI]
     JNE NAO_GANHOU
     JMP GANHOU
 
 NAO_GANHOU:
+    POP SI
+    POP BX
     MOV AL, 0
     RET
     
 GANHOU:
+    POP SI
+    POP BX
     MOV AL, 1
     RET
 VERIFICA_VITORIA ENDP
@@ -804,8 +813,24 @@ LOOP_LINHAS:
     JE PROXIMA_LINHA
     
     ; achou onde jogar
-    MOV SI, DX
-    MOV BYTE PTR tabuleiro[SI], 'O'
+
+    MOV AX, DX
+    MOV CL, 3
+    DIV CL      ; AL = Linha, AH = Coluna
+    
+    ; Configura SI (Coluna)
+    MOV BL, AH
+    MOV BH, 0
+    MOV SI, BX
+    
+    ; Configura BX Offset Linha = Linha * 3
+    MOV BL, AL
+    MOV AL, 3
+    MUL BL
+    MOV BX, AX
+    
+    MOV AL, 'O'
+    MOV tabuleiro[BX][SI], AL
     POP CX
     MOV AH, 1
     RET
@@ -827,14 +852,27 @@ ANALISA_LUGAR PROC
     PUSH SI 
     PUSH AX
     
-    MOV SI, BX  ; usa o indice linear direto (0-8)
+    MOV AX, BX
+    MOV CL, 3
+    DIV CL   ; AL = linha, AH = coluna
     
-    ; compara
+    ; Configura SI (Coluna) 
+    MOV BL, AH
+    MOV BH, 0
+    MOV SI, BX
+    
+    ; Configura BX (Offset Linha = Linha * 3)
+    MOV BL, AL
+    MOV AL, 3
+    MUL BL
+    MOV BX, AX
+
+    ; Agora compara usando a notacao de matriz [BX][SI]
     MOV AL, char_temp
-    CMP tabuleiro[SI], AL
+    CMP tabuleiro[BX][SI], AL
     JE EH_IGUAL
-    
-    CMP tabuleiro[SI], '9'
+
+    CMP tabuleiro[BX][SI], '9'
     JBE EH_LIVRE
     
     JMP SAI_DA_ANALISE
@@ -844,7 +882,8 @@ EH_IGUAL:
     JMP SAI_DA_ANALISE
 
 EH_LIVRE:
-    MOV DX, BX  ; achou vazio, guarda o indice em DX
+    MOV DX, BX
+    ADD DX, SI
     JMP SAI_DA_ANALISE
 
 SAI_DA_ANALISE:
