@@ -130,11 +130,7 @@ LER_OPCAO_MENU:
     JNE LER_OPCAO_MENU
     JMP SAIR  ; se nao for 1, 2 OU 3 le de novo
 
-RELAY_SAIR:
-    ; isso é necessário pq o JE é um pulo curte e ele não consegue chegar no fim do mais
-    ; antes de dar errado, então precisa de um relay para ele conseguir chegar la
-    ;pq jmp tem alcance no arquivo inteiro  
-    JMP SAIR
+
 OPCAO_VALIDA:
 
 
