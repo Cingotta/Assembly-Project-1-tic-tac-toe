@@ -466,6 +466,7 @@ SAIR:
     INT 10h
 
     ; loop duplo para dar tempo o bastante de ler a mensagem
+    ; tome cuidado, qualquer alteração, emsmo pequena muda o mto o tempo de espera
     MOV CX, 06FFh
 LOOP_ESPERA_SAIR:
     PUSH CX
