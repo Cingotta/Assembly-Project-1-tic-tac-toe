@@ -19,6 +19,7 @@ INCLUDE macros.inc
     msg_ganhou    DB 'PARABENS! VOCE GANHOU! $'
     msg_perdeu    DB 'QUE PENA! VOCE PERDEU! $' 
     msg_velha     DB 'DEU VELHA... NINGUEM GANHOU $'
+    msg_sair      DB 'Obrigado por jogar! $'
     
     ; outras msgs
     msg_vez       DB 'Vez do Jogador: $'
@@ -445,8 +446,37 @@ LIMPA_BUFFER_MENU:
 
 SAIR:
 
-    CALL LIMPA_TELA
+    ; configura video dnv que limpa a tela
+    MOV AX, 3h
+    INT 10h
 
+    ; mostra a msg de sair
+    MOV AH, 13h
+    MOV AL, 1
+    MOV BH, 0
+    MOV BL, 0Eh ; cor amarelo
+    MOV CX, 19 ; tamanho da msg
+    PUSH DS
+    POP ES
+    LEA BP, msg_sair
+
+    MOV DH, 12
+    MOV DL, 30
+
+    INT 10h
+
+    ; loop duplo para dar tempo o bastante de ler a mensagem
+    MOV CX, 06FFh
+LOOP_ESPERA_SAIR:
+    PUSH CX
+    NOP
+LOOP_ESPERA_INTERNA:
+    NOP
+    LOOP LOOP_ESPERA_INTERNA
+    POP CX
+    LOOP LOOP_ESPERA_SAIR
+
+    CALL LIMPA_TELA
     ; sai do jogo
     MOV AH, 4Ch
     INT 21h
