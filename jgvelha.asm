@@ -2,6 +2,8 @@ TITLE JogoDaVelha
 .MODEL SMALL
 .STACK 100h
 
+.INCLUDE macros.inc
+
 .DATA
     ;variaveis durante ou antes jogo
     titulo_menu   DB '=== JOGO DA VELHA ===$'
