@@ -34,7 +34,7 @@ INCLUDE macros.inc
     msg_perdeu_ai DB 'PERDEU TENTE NOVAMENTE'
     msg_wait      DB 'Pressione qualquer tecla para voltar ao menu...$'
     
-    ; a matris do jogo (3x3)
+    ; a matriz do jogo (3x3)
     ; 1-9 = vazio, X = player 1, O = player 2
     tabuleiro     DB 3 DUP (3 DUP (?))
     
@@ -44,7 +44,7 @@ INCLUDE macros.inc
     jogadas_count DB 0  ; conta as jogadas pra ver se deu velha
     char_temp     DB ?  ; variavel auxiliar
     
-    ; linhas q ganham o jogo (trios)
+    ; linhas que ganham o jogo (trios)
     linhas_ganha  DB 0,1,2, 3,4,5, 6,7,8
                   DB 0,3,6, 1,4,7, 2,5,8
                   DB 0,4,8, 2,4,6
@@ -150,12 +150,12 @@ OPCAO_VALIDA:
 
 
 
-LOOP_PRINCIPAL:   ;esse aq é o loop q tudo roda, (exeto o menu claro), ele tem o vs human o e o vs ai junto
-    ; desenha a matris atualizada na tela
+LOOP_PRINCIPAL:   ;loop para rodar os modos de jogo (JvJ e JvIA)
+    ; desenha a matriz atualizada na tela
     CALL DESENHA_MATRIZ 
     
     ; mostra de quem e a vez  
-    ;detalhe, tudo isso ainda é mostrado na ai, mas como o computador é mto rapido n da pra ver, talvez mudar isso em uma proxima versão 
+    ;Este processo também é feito nas jogadas do computador, porem é exibido na tela em uma fração de segundo
     MOV AH, 02h
     MOV BH, 0
     MOV DH, 5
@@ -196,19 +196,19 @@ VEZ_HUMANO:
     INT 21h
     
 LER_INPUT:
-    ; essa função 07h é para pegar o caracter igal o 01h mas ele não da "echo", (ele n mostra o caracter na tela) ai fica mais bonito
+    ; A instrução 07h no macro, recebe a instrução de obter o caractere sem reproduzi-lo na tela
 
     SCANCHAR
     
 
     
-    ; ve se ta entre 1 e 9
+    ; ve se o input esta entre 1 e 9
     CMP AL, '1'
     JL LER_INPUT 
     CMP AL, '9'
     JG LER_INPUT 
     
-    ; imprime o numero q digitou, acontece meio rapido dms, aparece so quando a jogara é invalida
+    ; imprime o numero que digitou, acontece muito rapido, aparece so quando a jogada é invalida
     PUSH AX
     MOV DL, AL
     MOV AH, 02h
@@ -220,7 +220,7 @@ LER_INPUT:
 
 
 
-    ; transforma o numero q digitou em numero de vdd (0-8)
+    ; transforma o numero que digitou em numero decimal (0-8)
     SUB AL, '1'
     
     ; CONTA DA MATRIZ
@@ -245,9 +245,9 @@ LER_INPUT:
     ; ve se o lugar ta vazio ou se ja tem uma jogada feita la
     ; acessa matris[BX][SI]
     CMP tabuleiro[BX][SI], '9'
-    JA TRATA_INVALIDA   ; se for maior q 9 ta ocupado, pq O e X é maisr em ascii
+    JA TRATA_INVALIDA   ; se for maior que 9 ta ocupado, pq O e X é maior em ascii
     
-    ; salva a jogada na matris
+    ; salva a jogada na matriz
     MOV AL, jogador_vez
     MOV tabuleiro[BX][SI], AL
     JMP FIM_JOGADA
@@ -262,8 +262,8 @@ TRATA_INVALIDA:
 
 
 VEZ_CPU:
-    ; --- IA DO COMPUTADOR
-    ; 1. tenta ganhar logo
+    ; IA DO COMPUTADOR
+    ; 1. tenta ganhar rapido
     MOV AL, 'O'
     CALL TENTA_FECHAR
     CMP AH, 1
@@ -275,13 +275,13 @@ VEZ_CPU:
     CMP AH, 1
     JE CPU_JOGOU
 
-    ; 3. tenta pegar o meio q eh bom
+    ; 3. tenta pegar o meio do tabuleiro
     MOV BX, 3
     MOV SI, 1
     CMP tabuleiro[BX][SI], '9'
     JBE ACHOU_VAZIO_DIRETO
     
-    ; 4. se nao der nada, pega o primeiro q tiver livre
+    ; 4. se nao der nada, pega a primeira posição livre
     XOR SI,SI
     
 PROCURA_VAZIO_LIN:
@@ -309,7 +309,7 @@ ACHOU_VAZIO_DIRETO:
     MOV tabuleiro[BX][SI], AL
 
 CPU_JOGOU:
-    ; da um tempo pro pc fingir q ta pensando
+    ; da um tempo pro pc fingir que esta pensando
     MOV CX, 0FFFFh
 ESPERA_PC:
     NOP 
@@ -408,7 +408,7 @@ FIM_VELHA:
     JMP ESPERA_VOLTAR
 
 ESPERA_VOLTAR:
-    ; espera apertar algo pra voltar
+    ; espera input do usuario para voltar
     MOV AH, 02h
     MOV BH, 0
     MOV DH, 20 
@@ -433,8 +433,7 @@ LIMPA_BUFFER_MENU:
 SAIR:
 
     ; configura video dnv que limpa a tela
-    MOV AX, 3h
-    INT 10h
+    LIMPATELA
 
     ; mostra a msg de sair
     MOV AH, 13h
@@ -452,7 +451,7 @@ SAIR:
     INT 10h
 
     ; loop duplo para dar tempo o bastante de ler a mensagem
-    ; tomar cuidado, qualquer alteração, emsmo pequena muda o mto o tempo de espera
+    ; tomar cuidado, qualquer alteração, mesmo pequena muda o mto o tempo de espera
     MOV CX, 06FFh
 LOOP_ESPERA_SAIR:
     PUSH CX
@@ -538,7 +537,7 @@ VERIFICA_VITORIA PROC
     PUSH BX
     PUSH SI
 
-    ; --- Linhas ---
+    ; Linhas
     MOV BX, 0   ; offset linha (0, 3, 6)
 
 CHECK_LINHAS_LOOP:
@@ -562,7 +561,7 @@ PROX_LINHA:
     CMP BX, 9
     JL CHECK_LINHAS_LOOP
 
-    ; --- Colunas ---
+    ;Colunas
     MOV SI, 0   ; coluna (0, 1, 2)
 
 CHECK_COLUNAS_LOOP:
@@ -586,7 +585,7 @@ PROX_COLUNA:
     CMP SI, 3
     JL CHECK_COLUNAS_LOOP
 
-    ; --- Diagonais ---
+    ;Diagonais
     ; Diagonal 1
     MOV BX, 0
     MOV SI, 0
@@ -642,7 +641,7 @@ EFEITO_PISCA PROC
     ;função - procedimento responsavel por criar o efeito multicor do fim de jogo
     ;entrada - vetor mensagem de vitória no .DATA
     ;saida - impressão da animação na tela
-    ;limpaa tela e reinicia a configuração de video
+    ;limpa a tela e reinicia a configuração de video
     LIMPATELA
     
     MOV DI, 0   ; cor atual
@@ -674,7 +673,7 @@ LOOP_CORES:
     PUSH CX       
     MOV BP, SI    
     
-    ; --- CORRECAO DO BUG DO SEGMENTO ---
+    ;CORRECAO DO BUG DO SEGMENTO
     ; tive q fazer isso pq tava dando pau no segmento
     PUSH DS
     POP ES
@@ -801,7 +800,7 @@ TENTA_FECHAR ENDP
 
 
 ANALISA_LUGAR PROC
-    ;peocedimento - função para erificar viabilidade da posição que a IA ira jogar
+    ;peocedimento - função para verificar viabilidade da posição que a IA ira jogar
     ;entrada - valor dos ponteiros das posições usadas na verificação
     ;saida - conclusão da verificação de posição
     PUSH BX 
