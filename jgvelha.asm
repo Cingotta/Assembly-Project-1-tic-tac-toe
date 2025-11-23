@@ -673,8 +673,7 @@ LOOP_CORES:
     PUSH CX       
     MOV BP, SI    
     
-    ;CORRECAO DO BUG DO SEGMENTO
-    ; tive q fazer isso pq tava dando pau no segmento
+
     PUSH DS
     POP ES
     
